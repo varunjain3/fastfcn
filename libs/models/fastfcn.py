@@ -2,8 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
+from torch.optim import RMSprop
+from configs import Configs
 
-from jpu import JPU
+
+from libs.models.jpu import JPU
+
+configs = Configs()
 
 
 class FastFCN(nn.Module):
@@ -17,7 +22,7 @@ class FastFCN(nn.Module):
 
     def __init__(self, n_classes, jpu_in_channels=(256, 512, 512), width=512):
         super().__init__()
-        vgg = torchvision.models.vgg16_bn(pretrained=True).features
+        vgg = torchvision.models.vgg16_bn(pretrained=False).features
 
         # confirm the architecture of vgg16 by "print(vgg)"
 
@@ -49,6 +54,18 @@ class FastFCN(nn.Module):
             x, size=(h, w), mode='bilinear', align_corners=True)
 
         return result
+
+    def save(self, optimizer: RMSprop, epoch, train_loss, val_loss):
+        dic = {
+            'epoch':  epoch,
+            'train_loss':  train_loss,
+            'val_loss':  val_loss,
+            'model':  self.state_dict(),
+            'optim':  optimizer.state_dict()
+        }
+        path = configs.saveDir + 'models/model_epoch_%d.pth' % epoch
+        torch.save(dic, path)
+        print('Saved Checkpoint at', path)
 
 
 # for debug
