@@ -3,12 +3,16 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torchvision import models
 from torchvision.models.vgg import VGG
 import pytorch_lightning as pl
+from torch.optim.rmsprop import RMSprop
+
 
 from dataloader import CustomDataset,lit_custom_data
 from pytorch_lightning import loggers
+from configs import Configs
 
 # class LightningMNISTClassifier(pl.LightningModule):
 
@@ -19,6 +23,8 @@ class FCN32s(pl.LightningModule):
         super(FCN32s, self).__init__()
         self.n_class = n_class
         self.pretrained_net = pretrained_net
+        self.configs = Configs()
+        self.save_hyperparameters()
         self.relu = nn.ReLU(inplace=True)
         self.deconv1 = nn.ConvTranspose2d(
             512, 512, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
@@ -58,14 +64,25 @@ class FCN32s(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         # training_step defines the train loop. It is independent of forward
-        x, y = batch
-        x = x.view(x.size(0), -1)
-        z = self.encoder(x)
-        x_hat = self.decoder(z)
-        loss = F.mse_loss(x_hat, x)
-        self.log('train_loss', loss)
+        x, y = batch.values()
+        x_hat = self(x)
+
+        loss = F.cross_entropy(x_hat, y)
+        self.log('train_loss', loss,on_step=True)
         return loss
 
+    def validation_step(self, batch, batch_idx):
+        x, y = batch.values()
+        x_hat = self(x)
+
+        loss = F.cross_entropy(x_hat, y)
+        self.log('valid_loss', loss,on_step=True)
+
+
+    def configure_optimizers(self):
+        optimizer = RMSprop(self.parameters(), lr=self.configs.base_lr,
+                    momentum=self.configs.momentum, weight_decay=self.configs.weight_decay)
+        return optimizer
 
 
 ranges = {
@@ -129,17 +146,19 @@ class VGGNet(VGG):
 
         return output
 
+    
 
-if __name__ == "__main__":
-    batch_size, n_class, h, w = 10, 20, 160, 160
+
+if __name__ == "__main__": 
+    batch_size, n_class, h, w = 10, 2, 160, 160
     vgg_model = VGGNet(requires_grad=True)
     
 
     fcn_model = FCN32s(pretrained_net=vgg_model, n_class=n_class)
     dataset = lit_custom_data()
 
-    logger = loggers.tensorboard("./logs/")
+    logger = loggers.TensorBoardLogger("./logs/")
 
-    trainer = pl.Trainer(logger=logger)
+    trainer = pl.Trainer(logger=logger,gpus=1)
     trainer.fit(fcn_model,dataset)
     print("hello")

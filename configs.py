@@ -24,9 +24,9 @@ class Configs():
 
         # dataset parameters
         self.rescale_size = 600
-        self.image_size = 224
+        self.image_size = 160
         self.num_class = 4  # Change later 20  # 20 classes for training
-        self.datasetPath = r"D:\Code\CV_project\lstm_fast_fcn\dataset.pt"
+        self.datasetPath = r"dataset.pt"
         self.n_images = 4  # Number of images needed together
         self.dataloader_workers = 12
         self.shuffle = True
